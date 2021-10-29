@@ -1,0 +1,78 @@
+import pandas as pd
+
+#데이터 불러오기
+
+ipo = pd.read_csv("d:/공모전/IPO/IPO/Data/IPO_origin.csv")
+finance_kq = pd.read_csv("d:/공모전/IPO/IPO/Data/Finance_KOSDAQ.csv")
+finance_ks = pd.read_csv("d:/공모전/IPO/IPO/Data/Finance_KOSPI.csv")
+trading_kq = pd.read_csv("d:/공모전/DATA/Trading_KOSDAQ.csv")
+trading_ks = pd.read_csv("d:/공모전/DATA/Trading_KOSPI.csv")
+
+# 트레이딩 정보 전처리(매칭하기 전 자료구조 정리) -> 파이낸스에도 적용가능
+# 변수 개수만 수정하면 새로운 데이터가 와도 정리 가능
+def tr_processing(df):
+    i = 0
+    j = 7 ## 엑셀에서 종목마다 변수가 7개인 경우
+    tr_list = []
+    tr_idx_origin = df.set_index("Code")
+    tr_idx_origin.index.name = "date"
+    while True:
+        tr_idx = tr_idx_origin.iloc[:,i:j]
+        i+=7
+        j+=7
+        tr_idx= tr_idx.rename(columns = tr_idx.iloc[1])
+        tr_idx = tr_idx.drop(tr_idx.index[1])
+        tr_idx["Name"] = tr_idx.iloc[0,0]
+        tr_idx= tr_idx.drop(tr_idx.index[0])
+        tr_idx.reset_index(drop = False,inplace = True)
+        tr_idx.set_index(["date","Name"],inplace = True,drop = True)
+        tr_list.append(tr_idx)
+        if j == 16387:## 마지막 열까지
+            break
+    return tr_list
+
+
+## ipo에 있는 코스닥,코스피 상장기업 자료 
+def tr_ipo(data):
+    num = 0
+    count = 0
+    ipo_trading = []
+    while True:      
+        a = data[num] 
+        find = ipo[ipo["종목명"] == a.index[0][1]]
+        if find.shape[0] == 1:
+            ipo_trading.append(a)
+        num += 1
+        if num == len(data):
+            break
+    return ipo_trading
+
+## 코스닥
+tr_kq_list = tr_processing(trading_kq)
+tr_kq_ipo = tr_ipo(tr_kq_list)
+
+## 코스피    
+tr_ks_list = tr_processing(trading_ks)
+tr_ks_ipo = tr_ipo(tr_ks_list)
+
+## 상장일 이전 데이터 삭제
+def date_processing(df):
+    after = []
+    for i in range(len(df)):
+        date = ipo_kq['상장일'][i]
+        after.append(df[i].truncate(before=date))
+    return after
+
+## 1개월치 구하기 
+ipo_ = []
+def cal_date(month,df):
+    if month == 1:      
+        for i in range(len(df)):
+            new = df[i].reset_index().rename(columns = {'level_0':'date','level_1':"종목명"})
+            new["date"] = pd.to_datetime(new['date'])
+            date = (new['date'][0] + timedelta(days=30)).isoformat()
+            clean_new = df[i][:date].apply(lambda x : x.apply(str).str.replace(',', '').astype('float64'),axis =1 )
+            expect = (clean_new.iloc[-1].values - clean_new.iloc[0].values)/ clean_new.iloc[0].values
+            ipo.append(expect)
+        last = pd.DataFrame(ipo)
+    return last

@@ -1,78 +1,139 @@
 import pandas as pd
+import numpy as np
+from datetime import datetime, timedelta
 
 #데이터 불러오기
 
-ipo = pd.read_csv("d:/공모전/IPO/IPO/Data/IPO_origin.csv")
-finance_kq = pd.read_csv("d:/공모전/IPO/IPO/Data/Finance_KOSDAQ.csv")
+ipo_kq = pd.read_csv("d:/공모전/IPO/IPO/Data/KQ_IPO.csv")
+finance_kq_q1 = pd.read_csv("d:/공모전/IPO/IPO/Data/KQ_Finance_Q1.csv")
+finance_kq_q2 = pd.read_csv("d:/공모전/IPO/IPO/Data/KQ_Finance_Q2.csv")
 finance_ks = pd.read_csv("d:/공모전/IPO/IPO/Data/Finance_KOSPI.csv")
-trading_kq = pd.read_csv("d:/공모전/DATA/Trading_KOSDAQ.csv")
+trading_kq = pd.read_csv("d:/공모전/IPO/IPO/Data/KQ_Trading.csv")
 trading_ks = pd.read_csv("d:/공모전/DATA/Trading_KOSPI.csv")
 
 # 트레이딩 정보 전처리(매칭하기 전 자료구조 정리) -> 파이낸스에도 적용가능
 # 변수 개수만 수정하면 새로운 데이터가 와도 정리 가능
+
 def tr_processing(df):
     i = 0
-    j = 7 ## 엑셀에서 종목마다 변수가 7개인 경우
+    j = 7
     tr_list = []
     tr_idx_origin = df.set_index("Code")
     tr_idx_origin.index.name = "date"
+    delete_name = []
     while True:
-        tr_idx = tr_idx_origin.iloc[:,i:j]
+        tr_idx = tr_idx_origin.iloc[:,i:j] ## 사용하는 변수 개수
         i+=7
         j+=7
-        tr_idx= tr_idx.rename(columns = tr_idx.iloc[1])
-        tr_idx = tr_idx.drop(tr_idx.index[1])
-        tr_idx["Name"] = tr_idx.iloc[0,0]
-        tr_idx= tr_idx.drop(tr_idx.index[0])
+        tr_idx= tr_idx.rename(columns = tr_idx.iloc[2]) ## 필요한 컬럼명이 있는 행
+        tr_idx = tr_idx.drop(tr_idx.index[1:3]) ## 필요없는 행 삭제
+        tr_idx["종목명"] = tr_idx.iloc[0,0] ## 행으로 있는 종목명을 새로운 열로 생성
+        if tr_idx["종목명"].isna().any() == True: ## 종목명이랑 자료가 없는 것 제거
+            del tr_idx
+            continue
+        tr_idx= tr_idx.drop(tr_idx.index[0]) ## 필요없는 행 삭제
         tr_idx.reset_index(drop = False,inplace = True)
-        tr_idx.set_index(["date","Name"],inplace = True,drop = True)
+        tr_idx.set_index(["date","종목명"],inplace = True,drop = True) ## 날짜랑 종목명 인덱스로 설정
         tr_list.append(tr_idx)
-        if j == 16387:## 마지막 열까지
+        if i == (trading_kq.shape[1]-1):
             break
-    return tr_list
+    return tr_list 
+    
+tr_kq_list  = tr_processing(trading_kq)
 
+## ipo파일에서 위에서 종목명이 없는 것 4개는 직접 삭제 후 푸쉬
 
-## ipo에 있는 코스닥,코스피 상장기업 자료 
-def tr_ipo(data):
-    num = 0
-    count = 0
-    ipo_trading = []
-    while True:      
-        a = data[num] 
-        find = ipo[ipo["종목명"] == a.index[0][1]]
-        if find.shape[0] == 1:
-            ipo_trading.append(a)
-        num += 1
-        if num == len(data):
-            break
-    return ipo_trading
+## ipo파일에서 6개월치 자료가 없는 종목 삭제
+def delete_ipo(df):
+    df_new = df.copy()
+    df_new['상장일'] = pd.to_datetime(df_new['상장일'])
+    df_new = df_new.set_index('상장일')
+    df_new = df_new[:'2019-06-30']
+    return df_new
+    
+clean_ipo_kq = delete_ipo(ipo_kq)
 
-## 코스닥
-tr_kq_list = tr_processing(trading_kq)
-tr_kq_ipo = tr_ipo(tr_kq_list)
-
-## 코스피    
-tr_ks_list = tr_processing(trading_ks)
-tr_ks_ipo = tr_ipo(tr_ks_list)
-
-## 상장일 이전 데이터 삭제
+## trade파일에서 상장일 이전 데이터와 6개월치 자료가 없는 종목 삭제
 def date_processing(df):
     after = []
+    copy_ipo_kq = ipo_kq.copy()
     for i in range(len(df)):
-        date = ipo_kq['상장일'][i]
-        after.append(df[i].truncate(before=date))
-    return after
+        date = copy_ipo_kq['상장일'][i]
+        new = df[i].truncate(before=date)
+        if new.index[0][0] <'2019-06-30':
+            after.append(new)
+    return after 
+    
+clean_tr_kq = date_processing(tr_kq_ipo)
 
-## 1개월치 구하기 
-ipo_ = []
-def cal_date(month,df):
-    if month == 1:      
+## len(clean_ipo_kq) == len(clean_tr_kq) 689개 
+
+## 결측값에 상관없이 바로 처리해버리는 코드
+def cal(month,df):
+    month_1 = []
+    month_3 = []
+    month_6 = []
+    ## 1개월 후
+    if month == 1:     
         for i in range(len(df)):
             new = df[i].reset_index().rename(columns = {'level_0':'date','level_1':"종목명"})
             new["date"] = pd.to_datetime(new['date'])
-            date = (new['date'][0] + timedelta(days=30)).isoformat()
+            date = (new['date'][0] +  relativedelta(months = 1)).isoformat() ## 날짜 바뀌는 부분
             clean_new = df[i][:date].apply(lambda x : x.apply(str).str.replace(',', '').astype('float64'),axis =1 )
             expect = (clean_new.iloc[-1].values - clean_new.iloc[0].values)/ clean_new.iloc[0].values
-            ipo.append(expect)
-        last = pd.DataFrame(ipo)
+            month_1.append(expect)
+        last = pd.DataFrame(month_1)
+    #3개월 후 
+    if month == 3:      
+        for i in range(len(df)):
+            new = df[i].reset_index().rename(columns = {'level_0':'date','level_1':"종목명"})
+            new["date"] = pd.to_datetime(new['date'])
+            date = (new['date'][0] +  relativedelta(months = 3)).isoformat() ## 날짜 바뀌는 부분
+            clean_new = df[i][:date].apply(lambda x : x.apply(str).str.replace(',', '').astype('float64'),axis =1 )
+            expect = (clean_new.iloc[-1].values - clean_new.iloc[0].values)/ clean_new.iloc[0].values
+            month_3.append(expect)
+        last = pd.DataFrame(month_3)
+    #6개월 후
+    if month == 6:      
+        for i in range(len(df)):
+            new = df[i].reset_index().rename(columns = {'level_0':'date','level_1':"종목명"})
+            new["date"] = pd.to_datetime(new['date'])
+            date = (new['date'][0] +  relativedelta(months = 6)).isoformat() ## 날짜 바뀌는 부분
+            clean_new = df[i][:date].apply(lambda x : x.apply(str).str.replace(',', '').astype('float64'),axis =1 )
+            expect = (clean_new.iloc[-1].values - clean_new.iloc[0].values)/ clean_new.iloc[0].values
+            month_6.append(expect)
+        last = pd.DataFrame(month_6)
+
     return last
+    
+new_col_1 = cal(1,clean_tr_kq)
+new_col_3 = cal(3,clean_tr_kq)
+new_col_6 = cal(6,clean_tr_kq
+
+## 변수랑 인덱스명 변경
+def change_name(month,df):
+    if month == 1:
+        df.columns = ['1개월 후 수정주가','1개월 후 수정시가', '1개월 후 수정고가', '1개월 후 수정저가', '1개월 후 개인 순매수수량(일간)','1개월 후 개인 매수수량 비중(일간)','1개월 후 개인 매도수량 비중(일간)']
+        df.index = clean_ipo_kq["종목명"]
+    if month == 3:
+        df.columns = ['3개월 후 수정주가','3개월 후 수정시가', '3개월 후 수정고가', '3개월 후 수정저가', '3개월 후 개인 순매수수량(일간)','3개월 후 개인 매수수량 비중(일간)','3개월 후 개인 매도수량 비중(일간)']
+        df.index = clean_ipo_kq["종목명"]
+    if month == 6:
+        df.columns = ['6개월 후 수정주가','6개월 후 수정시가', '6개월 후 수정고가', '6개월 후 수정저가', '6개월 후 개인 순매수수량(일간)','6개월 후 개인 매수수량 비중(일간)','6개월 후 개인 매도수량 비중(일간)']
+        df.index = clean_ipo_kq["종목명"]
+    return df
+month_1_kq = change_name(1,new_col_1)
+month_3_kq = change_name(3,new_col_3)
+month_6_kq = change_name(6,new_col_6)
+
+
+
+## 특정 종목의 특정 날짜 데이터 구하기
+def connect(name,date):
+    test_ipo = clean_ipo_kq.copy()
+    test.reset_index(drop = True,inplace = True)
+    num = test[test['종목명'] == name].index[0]
+    
+    return clean_tr_kq[num].xs(date)
+
+ex)mfm = connect("엠에프엠코리아","2019-06-19") 하면 엠에프엠코리아 2019-06-19 날짜 trading 데이터 한 행만 추출

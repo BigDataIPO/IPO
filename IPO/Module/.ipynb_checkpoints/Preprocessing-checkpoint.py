@@ -1,4 +1,11 @@
 # -*- coding: utf-8 -*-
+import pandas as pd
+import numpy as np
+from dateutil.relativedelta import relativedelta
+from datetime import datetime
+from dateutil.parser import parse
+
+
 def ipo_processing(ipo):
     """
     ipo 엑셀파일 전처리
@@ -39,27 +46,31 @@ def FeatureDf_processing(FeatureDf):
 
 # stock = FeatureDf_processing(stock)
 # trading = FeatureDf_processing(trading)
+# finance = FeatureDf_processing(finance)
 
 
-# +
+# -
+
 def MatchItem(IPOcoms, FeatureDf, TargetDf, indexer, finding):
     """
     IPO상장기업에 대해서 특정날(indexer)에 찾고자하는 지표(finding)을 TargetDf에서 찾은뒤 FeatureDf에 indexer날에 넣어줌
+    상장일에 해당하는 stock 변수 넣음
     """
-    FeatureDf[indexer + finding] = np.nan
+    FeatureDf[finding] = np.nan
     for i in IPOcoms:
         IPOday = FeatureDf.loc[i,indexer]
         Adj_price = TargetDf.loc[(i,finding),IPOday]
-        FeatureDf.loc[i,indexer + finding] = Adj_price[0]
+        FeatureDf.loc[i,finding] = Adj_price
     return FeatureDf
-
-#Traindata = MatchItem(IPOcoms,ipo,stock,'상장일','수정주가')
+# IPOcoms = ipo.index
+# Traindata = MatchItem(IPOcoms,ipo,stock,'상장일','수정주가')
 
 
 # +
 def MatchItem_month(IPOcoms, FeatureDf, TargetDf, indexer, finding , month_index , month ):
     """
     IPO상장기업에 대해서 특정날(indexer)에 찾고자하는 지표(finding)을 TargetDf에서 찾은뒤 FeatureDf에 indexer날에 넣어줌
+    상장 후 1달,3달,6달 후 수정주가 넣음
     """
     IPOcoms = FeatureDf.index
     FeatureDf[month_index + ' ' + finding] = np.nan
@@ -80,10 +91,40 @@ New_com = trading.loc['메디톡스'].index ## 새로운 컬럼이 있는 df 이
 def Matchitem_New(New_coms, FeatureDF):
     """
     IPO종목에 대한 새로운 컬럼 가져왔을때 Clean_data에 추가로 열 생성
+    상장일에 해당하는 trading 변수 넣음
     """
     New_coms = FeatureDF.loc['메디톡스'].index
     for i in New_coms:
         Train_data = MatchItem(IPOcoms,Traindata,FeatureDF,'상장일',i)
         
     return Train_data
-# Train_data = Matchitem_New(New_com, trading)
+# Traindata = Matchitem_New(New_com, trading)
+
+
+# -
+
+def MatchItem_finance(IPOcoms, FeatureDf, TargetDf, indexer, finding):
+    """
+    IPO상장기업에 대해서 특정날(indexer)에 찾고자하는 지표(finding)을 TargetDf에서 찾은뒤 FeatureDf에 indexer날에 넣어줌
+    상장년도에 해당하는 finance 정보를 변수값으로 넣음
+    """
+    FeatureDf[finding] = np.nan
+    for i in IPOcoms:
+        IPOday = FeatureDf.loc[i,indexer]
+        financeday = datetime(parse(IPOday).year,12,31) ## 상장년도 마지막 날 구하기
+        financeday = financeday.date()
+        Adj_price = TargetDf.loc[(i,finding),str(financeday)]
+        FeatureDf.loc[i,finding] = Adj_price[0]
+    return FeatureDf
+
+
+def Matchitem_New_fi(FeatureDF):
+    """
+    IPO종목에 대한 새로운 컬럼 가져왔을때 Clean_data에 추가로 열 생성
+    """
+    New_coms = FeatureDF.loc['메디톡스'].index
+    for i in New_coms:
+        Train_data = MatchItem_finance(IPOcoms,Traindata,FeatureDF,'상장일',i) 
+        
+    return Train_data
+Traindata = Matchitem_New_fi(finance)

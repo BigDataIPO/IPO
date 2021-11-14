@@ -4,6 +4,7 @@ import numpy as np
 from dateutil.relativedelta import relativedelta
 from datetime import datetime
 from dateutil.parser import parse
+import pickle
 
 
 # +
@@ -220,7 +221,26 @@ test.to_csv("X_train_1_3.csv",encoding = 'euc-kr')
 ## 위의 트레이딩 + market변수 추가
 
 test = X_train_1_3.copy()
+tr_kq = pd.read_csv("d:/공모전/DATA/Trading_KOSDAQ.csv")
+## 비영업일 뺀 날짜 있는 데이터
+trading_date = list(tr_kq.iloc[:,13:].columns) ## 13부터가 필요한 날짜 시작
+trading_date
 
+# +
+## 비영업일 제외한 날짜 가져오기
+
+# save
+with open('trading_date.pickle', 'wb') as f:
+    pickle.dump(trading_date, f, pickle.HIGHEST_PROTOCOL)
+
+# load
+with open('trading_date.pickle', 'rb') as f:
+    date = pickle.load(f)
+    
+trade = trading[date] ## 비영업일 뺀 데이터만 있음
+
+
+# -
 
 def MatchItem_rotation_trading(IPOcoms, FeatureDf, TargetDf, indexer, finding_1,finding_2, name, num):
     """

@@ -254,7 +254,7 @@ def return_rate(IPOcoms,FeatureDf,TargetDf,name,num):
         return_rate = (new_price - pre_price)/pre_price
         FeatureDf.loc[i,name] = return_rate
     return FeatureDf
-    
+
 
 
 def rate_month_to_month(IPOcoms, FeatureDf, TargetDf, name, num_first, num_second):

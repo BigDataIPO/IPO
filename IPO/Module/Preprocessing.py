@@ -7,12 +7,6 @@ from dateutil.parser import parse
 import pickle
 
 
-# +
-# ipo = KQ_IPO
-# finance = KQ_Finance
-# trading = KQ_Trading
-# -
-
 def ipo_processing(ipo):
     """
     ipo 엑셀파일 전처리
@@ -33,10 +27,8 @@ def ipo_processing(ipo):
     ipo = ipo.drop(delete_item, axis=0)
     
     return ipo
-ipo = ipo_processing(ipo)
 
 
-# +
 def FeatureDf_processing(FeatureDf):
     """
     IPO 파일에 넣어줄 변수가 있는 엑셀 전처리
@@ -46,11 +38,6 @@ def FeatureDf_processing(FeatureDf):
 
      return FeatureDf
 
-finance = FeatureDf_processing(finance)
-trading = FeatureDf_processing(trading)
-
-
-# -
 
 # ## 파이낸스 변수 추가
 
@@ -86,10 +73,10 @@ def Matchitem_New(FeatureDF):
         Train_data = MatchItem_finance(IPOcoms,ipo,FeatureDF,'상장일',i) ## 
     return Train_data
 
-Train_data = Matchitem_New(finance)
 
 
-# +
+# -
+
 def new_fi(IPOcoms,FeatureDf, TargetDf, indexer, finding):
     FeatureDf[finding + '-before'] = np.nan
     for i in IPOcoms:
@@ -104,27 +91,8 @@ def new_fi(IPOcoms,FeatureDf, TargetDf, indexer, finding):
         FeatureDf.loc[i,finding + '-before'] = Adj_price[0]
     return FeatureDf
 
-IPOcoms = ipo.index
-Train_data = new_fi(IPOcoms,Train_data,finance,'상장일','매출액증가율(YoY)')
-Train_data = new_fi(IPOcoms,Train_data,finance,'상장일','영업이익증가율(YoY)')
-# -
-
-Train_data.to_csv("X_train(finance).csv",encoding = 'euc-kr')
-## 파이낸스 정보만 들어간 것
 
 # ## 트레이딩 변수
-
-test = Train_data.copy()
-
-## IPO_Per 계산 공식
-test['IPO_PER'] = test['공모가(원)']/(test['당기순이익(지배)']*1000/test['상장주식수'])
-## IPO_Pbr
-test['IPO_PBR'] = test['공모가(원)']/(test['자본총계(지배)']*1000/test['상장주식수'])
-## IPO_EV/EBIDTA
-test['IPO_EV/EBIDTA'] = ((test['공모가(원)']*test['상장주식수'])+test['순부채'])/(test['EBITDA2']*1000)
-## IPO_PSR
-test['IPO_PSR'] = test['공모가(원)']/(test['매출액']*1000/test['상장주식수'])
-
 
 def MatchItem(IPOcoms, FeatureDf, TargetDf, indexer, finding):
     """
@@ -162,10 +130,6 @@ def MatchItem_month(IPOcoms, FeatureDf, TargetDf, indexer, finding , month_index
 
 # ## 시장변수
 
-# market = KQ_Market
-market.set_index('Item Name ', inplace = True)
-
-
 def MatchItem_Market_1_3(IPOcoms, FeatureDf, TargetDf, indexer, finding , second):
     """
     Market에서 특정 변수들 1년전 대비 1달 전 가격 넣어주는 함수
@@ -181,16 +145,6 @@ def MatchItem_Market_1_3(IPOcoms, FeatureDf, TargetDf, indexer, finding , second
         per = (month_v - year_v)/year_v
         FeatureDf.loc[i,finding] = per
     return FeatureDf
-
-
-test = MatchItem_Market_1_3(IPOcoms, test, market, \
-                            '상장일', '시장수익률' , '종가지수')
-test = MatchItem_Market_1_3(IPOcoms, test , market,\
-                            '상장일', 'M2 증감률 ' , 'M2')
-test = MatchItem_Market_1_3(IPOcoms, test , market,\
-                            '상장일', 'MMF 증감률 ' , 'MMF')
-test = MatchItem_Market_1_3(IPOcoms, test , market,\
-                            '상장일', '고객예탁금 증감률 ' , '고객예탁금')
 
 
 def MatchItem_interest_1_3(IPOcoms, FeatureDf, TargetDf, indexer, finding , second):
@@ -210,38 +164,6 @@ def MatchItem_interest_1_3(IPOcoms, FeatureDf, TargetDf, indexer, finding , seco
     return FeatureDf
 
 
-test = MatchItem_interest_1_3(IPOcoms, test, market,\
-                              '상장일','국고1년시장금리%p' , '국고1년시장금리')
-test = MatchItem_interest_1_3(IPOcoms, test, market,\
-                              '상장일', '국고3년시장금리%p' , '국고3년시장금리')
-test = MatchItem_interest_1_3(IPOcoms, test, market,\
-                              '상장일', '국고5년시장금리%p' , '국고5년시장금리')
-
-test.to_csv("X_train_1_3.csv",encoding = 'euc-kr')
-## 위의 트레이딩 + market변수 추가
-
-test = X_train_1_3.copy()
-tr_kq = pd.read_csv("d:/공모전/DATA/Trading_KOSDAQ.csv")
-## 비영업일 뺀 날짜 있는 데이터
-trading_date = list(tr_kq.iloc[:,13:].columns) ## 13부터가 필요한 날짜 시작
-trading_date
-
-# +
-## 비영업일 제외한 날짜 가져오기
-
-# save
-with open('trading_date.pickle', 'wb') as f:
-    pickle.dump(trading_date, f, pickle.HIGHEST_PROTOCOL)
-
-# load
-with open('trading_date.pickle', 'rb') as f:
-    date = pickle.load(f)
-    
-trade = trading[date] ## 비영업일 뺀 데이터만 있음
-
-
-# -
-
 def MatchItem_rotation_trading(IPOcoms, FeatureDf, TargetDf, indexer, finding_1,finding_2, name, num):
     """
     트레이딩 기준 시가총액 회전율 넣어주는 공식
@@ -259,13 +181,6 @@ def MatchItem_rotation_trading(IPOcoms, FeatureDf, TargetDf, indexer, finding_1,
         rotation = (money/mean_all)*100
         FeatureDf.loc[i,name] = rotation
     return FeatureDf
-
-
-
-test = MatchItem_rotation_trading(IPOcoms,test,trade,'상장일','거래대금',\
-                                  '시가총액','1개월 시가총액회전율',1)
-test = MatchItem_rotation_trading(IPOcoms,test,trade,'상장일','거래대금',\
-                 '시가총액','3개월 시가총액회전율',3)
 
 
 def MatchItem_rotation_market(IPOcoms, FeatureDf, TargetDf, indexer, finding_1,finding_2, name, num):
@@ -287,13 +202,6 @@ def MatchItem_rotation_market(IPOcoms, FeatureDf, TargetDf, indexer, finding_1,f
     return FeatureDf
 
 
-test = MatchItem_rotation_market(IPOcoms,test,market_rotation,'상장일','거래대금',\
-                             '시가총액','1개월 시장 회전율',1)
-test = MatchItem_rotation_market(IPOcoms,test,market_rotation,'상장일','거래대금',\
-                             '시가총액','3개월 시장 회전율',3)
-
-
-# +
 def MatchItem_mean(IPOcoms, FeatureDf, TargetDf, indexer, finding , name, num):
     """
     트레이딩 변수들 1,3개월 비중 평균내는 공식
@@ -309,36 +217,84 @@ def MatchItem_mean(IPOcoms, FeatureDf, TargetDf, indexer, finding , name, num):
     return FeatureDf
 
 
-# -
+def MatchItem_Market_3_6(IPOcoms, FeatureDf, TargetDf, indexer, finding , second):
+    """
+    Market에서 특정 변수들 3개월후 대비 1개월후 넣어주는 함수
+    """
+    FeatureDf[finding] = np.nan
+     
+    for i in IPOcoms:
+        IPOday = FeatureDf.loc[i,indexer]
+        month_3 = str((parse(IPOday) + relativedelta(months= 3)).date())
+        month_1 = str((parse(IPOday) + relativedelta(months = 1)).date())
+        month_v = float(TargetDf.loc[second,month_3])
+        year_v = float(TargetDf.loc[second,month_1])
+        per = (month_v - year_v)/year_v
+        FeatureDf.loc[i,finding] = per
+    return FeatureDf
 
-## 변수 넣어주기
-test = MatchItem_mean(IPOcoms,test,trade,'상장일','거래량회전율',\
-                      '1개월 평균 거래량회전율',1)
-test = MatchItem_mean(IPOcoms,test,trade,'상장일','거래량회전율',\
-                      '3개월 평균 거래량회전율',3)
-test = MatchItem_mean(IPOcoms,test,trade,'상장일','일중변동률',\
-                      '1개월 평균 일중변동률',1)
-test = MatchItem_mean(IPOcoms,test,trade,'상장일','일중변동률',\
-                      '3개월 평균 일중변동률',3)
-test = MatchItem_mean(IPOcoms,test,trade,'상장일','개인 매도수량 비중(일간)',\
-                      '1개월 평균 개인 매도수량 비중(일간)',1)
-test = MatchItem_mean(IPOcoms,test,trade,'상장일','개인 매도수량 비중(일간)',\
-                      '3개월 평균 개인 매도수량 비중(일간)',3)
-test = MatchItem_mean(IPOcoms,test,trade,'상장일','개인 매수수량 비중(일간)',\
-                      '1개월 평균 개인 매수수량 비중(일간)',1)
-test = MatchItem_mean(IPOcoms,test,trade,'상장일','개인 매수수량 비중(일간)',\
-                      '3개월 평균 개인 매수수량 비중(일간)',3)
-test = MatchItem_mean(IPOcoms,test,trade,'상장일','기관 매수수량 비중(일간)',\
-                      '1개월 평균 기관 매수수량 비중(일간)',1)
-test = MatchItem_mean(IPOcoms,test,trade,'상장일','기관 매수수량 비중(일간)',\
-                      '3개월 평균 기관 매수수량 비중(일간)',3)
-test = MatchItem_mean(IPOcoms,test,trade,'상장일','기관 매도수량 비중(일간)',\
-                      '1개월 평균 기관 매도수량 비중(일간)',1)
-test = MatchItem_mean(IPOcoms,test,trade,'상장일','기관 매도수량 비중(일간)',\
-                      '3개월 평균 기관 매도수량 비중(일간)',3)
-test['IPO시가총액'] = test['공모가(원)']*test['상장주식수']
 
-# > 변수 리스트로 설정해서 위에 코드를 간단하게 하는 함수 만들기
+# ## 종속변수
+
+def return_rate(IPOcoms,FeatureDf,TargetDf,name,num):
+    """
+    공모가 대비 1,3,6 수익률 계산
+    """
+    
+    FeatureDf[name] = np.nan
+    for i in IPOcoms:
+        IPOday = FeatureDf.loc[i,'상장일']
+        month = parse(IPOday).date() + relativedelta(months = num)
+        month = str(month)
+        ## 몇 개월 뒤 종가
+        new_price = TargetDf.loc[(i,'종가'),month]
+        ## 공모가
+        pre_price = FeatureDf.loc[i,'공모가']
+        ## 수익률
+        return_rate = (new_price - pre_price)/pre_price
+        FeatureDf.loc[i,name] = return_rate
+    return FeatureDf
+
+
+
+def rate_month_to_month(IPOcoms, FeatureDf, TargetDf, name, num_first, num_second):
+    """
+    1_3 수익률 , 3_6 수익률 계산
+    """
+    FeatureDf[name] = np.nan
+     
+    for i in IPOcoms:
+        IPOday = FeatureDf.loc[i,'상장일']
+        first_m = str(parse(IPOday).date() + relativedelta(months = num_first))
+        second_m = str(parse(IPOday).date() + relativedelta(months = num_second))
+        ## 첫번째 개월 뒤 종가
+        new_price = TargetDf.loc[(i,'종가'),first_m]
+        ## 두번째 개월 뒤 종가
+        next_price = TargetDf.loc[(i,'종가'),second_m]
+        
+        ## 수익률
+        return_rate = (new_price - next_price)/next_price
+        FeatureDf.loc[i,name] = return_rate
+                       
+                       
+    return FeatureDf
+
+
+def scoring(x):
+    """
+    카테고리화 예시
+    """
+    if x <  -0.40:
+        return 1
+    elif x < -0.20:
+        return 2
+    elif x < 0 :
+        return 3
+    elif x < 0.20:
+        return 4
+    else :
+        return 5
+
 
 # ## 변수 위치 재설정
 
@@ -452,5 +408,3 @@ test.columns = [['IPO']*5 + ['Finance']*23 + ['Trading']*14 + ['Market']*9 ,\
  '국고5년시장금리%p']]
 
 # > 엑셀 불러오면 멀티인덱스 풀리기에 불러온 뒤 멀티인덱스 편하게 설정하는 방법 찾기
-
-test.to_csv("X_train_1_3(all).csv", encoding = 'euc-kr')

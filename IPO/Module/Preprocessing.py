@@ -7,27 +7,30 @@ from dateutil.parser import parse
 import pickle
 
 
+# +
 def ipo_processing(ipo):
     """
     ipo 엑셀파일 전처리
     """
-    ipo = ipo[['상장유형','종목명','공모가(원)','상장일','상장주식수']] ## 필요한 열만 사용
-    ipo = ipo[~ipo['종목명'].str.contains("스팩")] ## 스팩이 들어간 종목 제거
+    ipo = ipo[['상장유형','종목명','공모가','상장일','상장주식수','경쟁률']] ## 필요한 열만 사용
+    ipo = ipo[~ipo['종목명'].str.contains("스팩")] ## 스팩이 들어간 종목 제거 92개
     ipo.set_index('종목명',inplace = True) ## 종목명을 인덱스로 설정
     
-    ipo['상장일'] = pd.to_datetime(ipo['상장일']) ## 날짜 계산을 위해 dt변환
-    ipo = ipo[ipo['상장일'] < '2019-06-30'] ## 상장일 이후 6개월 안되는 종목 삭제757개 -> 689개
-    ipo = ipo[ipo['상장유형'] != '재상장'] ## 재상장은 공모가가 0원으로 잡힘 689개 -> 665개
+#     ipo['상장일'] = pd.to_datetime(ipo['상장일']) ## 날짜 계산을 위해 dt변환
+#     ipo = ipo[ipo['상장일'] < '2020-12-31'] ## 상장일 이후 3개월 안되는 종목 삭제757개 -> 689개
+#     ipo = ipo[ipo['상장유형'] != '상장'] ## 재상장은 공모가가 0원으로 잡힘 689개 -> 665개
     ipo['상장일'] = ipo['상장일'].astype(str) ## 추후 인덱싱을 위한 str처리
     
     ## 데이터 값 전부 없는 경우 삭제
-    delete_item = ["성융광전투자유한공사","리드","케이엠에이치신라레저",
-                   "펩트론","파마리서치","신텍","로보티즈","원바이오젠",
-                   "코퍼스코리아","네프로아이티","수젠텍"] ## 추가필요
+    delete_item = ["성융광전투자유한공사","리드",
+                   "로보티즈","원바이오젠",
+                   "코퍼스코리아","수젠텍","강원","녹십자랩셀","펌텍코리아","포커스에이치엔에스"] ## 추가필요
     ipo = ipo.drop(delete_item, axis=0)
     
     return ipo
 
+
+# -
 
 def FeatureDf_processing(FeatureDf):
     """
@@ -77,21 +80,6 @@ def Matchitem_New(FeatureDF):
 
 # -
 
-def new_fi(IPOcoms,FeatureDf, TargetDf, indexer, finding):
-    FeatureDf[finding + '-before'] = np.nan
-    for i in IPOcoms:
-        IPOday = FeatureDf.loc[i,indexer]
-        if parse(IPOday).date().month < 4:
-            IPOday= datetime(parse(IPOday).year,12,31).date()\
-            - relativedelta(years = 3)
-        else :
-            IPOday= datetime(parse(IPOday).year,12,31).date()\
-            - relativedelta(years = 2)
-        Adj_price = TargetDf.loc[(i,finding),str(IPOday)]
-        FeatureDf.loc[i,finding + '-before'] = Adj_price[0]
-    return FeatureDf
-
-
 # ## 트레이딩 변수
 
 def MatchItem(IPOcoms, FeatureDf, TargetDf, indexer, finding):
@@ -128,83 +116,85 @@ def MatchItem_month(IPOcoms, FeatureDf, TargetDf, indexer, finding , month_index
 
 # -
 
-# ## 시장변수
-
-def MatchItem_Market_1_3(IPOcoms, FeatureDf, TargetDf, indexer, finding , second):
+def MatchItem_per(IPOcoms, FeatureDf, finding ,num):
     """
-    Market에서 특정 변수들 1년전 대비 1달 전 가격 넣어주는 함수
+    per/pbr/ev 등등 구하기
     """
     FeatureDf[finding] = np.nan
-     
     for i in IPOcoms:
-        IPOday = FeatureDf.loc[i,indexer]
-        year = str((parse(IPOday) - relativedelta(years= 1)).date())
-        month = str((parse(IPOday) - relativedelta(months = 1)).date())
-        month_v = float(TargetDf.loc[second,month])
-        year_v = float(TargetDf.loc[second,year])
-        per = (month_v - year_v)/year_v
+        IPOday = FeatureDf.loc[i,'상장일']
+        month = str(parse(IPOday).date() + relativedelta(months=num))
+        
+        if parse(month).date().month < 4:
+            day= datetime(parse(month).year,12,31).date() - \
+            relativedelta(years = 2)
+        else :
+            day = datetime(parse(month).year,12,31).date() - \
+            relativedelta(years = 1)
+            
+        num_1 = trading.loc[(i,'종가'),month]
+        num_2 = stock.loc[i,month][0]
+        num_3 = finance.loc[(i,'당기순이익'),str(day)]
+        
+        per = (num_1*num_2)/(num_3*1000)
         FeatureDf.loc[i,finding] = per
     return FeatureDf
 
 
-def MatchItem_interest_1_3(IPOcoms, FeatureDf, TargetDf, indexer, finding , second):
+def MatchItem_pbr(IPOcoms, FeatureDf, finding ,num):
     """
-    Market에서 금리변수들 1년전 대비 1달 전 가격 넣어주는 함수
+    per/pbr/ev 등등 구하기
     """
     FeatureDf[finding] = np.nan
-     
     for i in IPOcoms:
-        IPOday = FeatureDf.loc[i,indexer]
-        year = str((parse(IPOday) - relativedelta(years= 1)).date())
-        month = str((parse(IPOday) - relativedelta(months = 1)).date())
-        month_v = float(TargetDf.loc[second,month])
-        year_v = float(TargetDf.loc[second,year])
-        per = month_v - year_v
-        FeatureDf.loc[i,finding] = per
+        IPOday = FeatureDf.loc[i,'상장일']
+        month = str(parse(IPOday).date() + relativedelta(months=num))
+        
+        if parse(month).date().month < 4:
+            day= datetime(parse(month).year,12,31).date() - \
+            relativedelta(years = 2)
+        else :
+            day = datetime(parse(month).year,12,31).date() - \
+            relativedelta(years = 1)
+            
+        num_1 = trading.loc[(i,'종가'),month]
+        num_2 = stock.loc[i,month][0]
+        num_3 = finance.loc[(i,'자본총계'),str(day)]
+        
+        pbr = (num_1*num_2)/(num_3*1000)
+        FeatureDf.loc[i,finding] = pbr
     return FeatureDf
 
 
-def MatchItem_rotation_trading(IPOcoms, FeatureDf, TargetDf, indexer, finding_1,finding_2, name, num):
+def MatchItem_ev(IPOcoms, FeatureDf, finding ,num):
     """
-    트레이딩 기준 시가총액 회전율 넣어주는 공식
+    per/pbr/ev 등등 구하기
     """
-    FeatureDf[name] = np.nan
+    FeatureDf[finding] = np.nan
     for i in IPOcoms:
-        IPOday = FeatureDf.loc[i,indexer]
-        month = parse(IPOday).date() + relativedelta(months = num)
-        month = str(month)
-        ## 거래대금
-        money = TargetDf.loc[(i,finding_1),IPOday:month].sum(axis=1)[0]
-        ## 시가총액
-        mean_all = TargetDf.loc[(i,finding_2),IPOday:month].mean(axis=1)[0]
-        ## 회전율
-        rotation = (money/mean_all)*100
-        FeatureDf.loc[i,name] = rotation
-    return FeatureDf
-
-
-def MatchItem_rotation_market(IPOcoms, FeatureDf, TargetDf, indexer, finding_1,finding_2, name, num):
-    """
-    시장 기준 시가총액 회전율 넣어주는 공식
-    """
-    FeatureDf[name] = np.nan
-    for i in IPOcoms:
-        IPOday = FeatureDf.loc[i,indexer]
-        month = parse(IPOday).date() + relativedelta(months = num)
-        month = str(month)
-        ## 거래대금
-        money = TargetDf.loc[finding_1,IPOday:month].sum()
-        ## 시가총액
-        mean_all = TargetDf.loc[finding_2,IPOday:month].mean()
-        ## 회전율
-        rotation = (money/(mean_all*1000000))*100
-        FeatureDf.loc[i,name] = rotation
+        IPOday = FeatureDf.loc[i,'상장일']
+        month = str(parse(IPOday).date() + relativedelta(months=num))
+        
+        if parse(month).date().month < 4:
+            day= datetime(parse(month).year,12,31).date() - \
+            relativedelta(years = 2)
+        else :
+            day = datetime(parse(month).year,12,31).date() - \
+            relativedelta(years = 1)
+            
+        num_1 = trading.loc[(i,'종가'),month]
+        num_2 = stock.loc[i,month][0]
+        num_3 = finance.loc[(i,'순부채'),str(day)]
+        num_4 = finance.loc[(i,'EBITDA2'),str(day)]
+        
+        ebitda = (num_1*num_2 + num_3*1000)/(num_4*1000)
+        FeatureDf.loc[i,finding] = ebitda
     return FeatureDf
 
 
 def MatchItem_mean(IPOcoms, FeatureDf, TargetDf, indexer, finding , name, num):
     """
-    트레이딩 변수들 1,3개월 비중 평균내는 공식
+    IPO상장기업에 대해서 특정날(indexer)에 찾고자하는 지표(finding)을 TargetDf에서 찾은뒤 FeatureDf에 indexer날에 넣어줌
     """
     FeatureDf[name] = np.nan
     for i in IPOcoms:
@@ -212,24 +202,129 @@ def MatchItem_mean(IPOcoms, FeatureDf, TargetDf, indexer, finding , name, num):
         month = parse(IPOday).date() + relativedelta(months = num)
         month = str(month)
         ## 변수 평균
-        mean = TargetDf.loc[(i,finding),IPOday:month].mean(axis=1)[0]
+        mean = TargetDf.loc[(i,finding),IPOday:month].mean()
         FeatureDf.loc[i,name] = mean
     return FeatureDf
 
 
-def MatchItem_Market_3_6(IPOcoms, FeatureDf, TargetDf, indexer, finding , second):
+
+def MatchItem_rotation(IPOcoms, FeatureDf, TargetDf, indexer, finding_1,finding_2, name, num):
     """
-    Market에서 특정 변수들 3개월후 대비 1개월후 넣어주는 함수
+    IPO상장기업에 대해서 특정날(indexer)에 찾고자하는 지표(finding)을 TargetDf에서 찾은뒤 FeatureDf에 indexer날에 넣어줌
+    """
+    FeatureDf[name] = np.nan
+    for i in IPOcoms:
+        IPOday = FeatureDf.loc[i,indexer]
+        month = parse(IPOday).date() + relativedelta(months = num)
+        month = str(month)
+        ## 거래대금
+        money = TargetDf.loc[(i,finding_1),IPOday:month].sum()
+        ## 시가총액
+        mean_all = TargetDf.loc[(i,finding_2),IPOday:month].mean()
+        ## 회전율
+        rotation = (money/mean_all)*100
+        FeatureDf.loc[i,name] = rotation
+    return FeatureDf
+
+
+def MatchItem_month(IPOcoms, FeatureDf, TargetDf, indexer, finding , month_index , month ):
+    """
+    IPO상장기업에 대해서 특정날(indexer)에 찾고자하는 지표(finding)을 TargetDf에서 찾은뒤 FeatureDf에 indexer날에 넣어줌
+    """
+    IPOcoms = FeatureDf.index
+    FeatureDf[month_index + '' + finding] = np.nan
+    for i in IPOcoms:
+        IPOday = FeatureDf.loc[i,indexer]
+        date = parse(IPOday)
+        newday = date.date() + relativedelta(months=month)
+        Adj_price = TargetDf.loc[(i,finding),str(newday)]
+        FeatureDf.loc[i,month_index + '' + finding] = Adj_price
+    return FeatureDf
+
+
+# ## 시장변수
+
+def MatchItem_marketmoney(IPOcoms, FeatureDf, TargetDf, name):
+    """
+    IPO상장기업에 대해서 특정날(indexer)에 찾고자하는 지표(finding)을 TargetDf에서 찾은뒤 FeatureDf에 indexer날에 넣어줌
+    """
+    FeatureDf[name] = np.nan
+    for i in IPOcoms:
+        IPOday = FeatureDf.loc[i,'상장일']
+        day_1 = str(parse(IPOday).date() - relativedelta(years = 1))
+        day_2 = str(parse(IPOday).date() - relativedelta(months = 1))
+        ## 거래대금
+        money = TargetDf.loc['거래대금',day_1:day_2].sum()
+        ## 시가총액
+        mean_all = TargetDf.loc['시가총액',day_1:day_2].mean()
+        ## 회전율
+        rotation = (money/mean_all)*100
+        FeatureDf.loc[i,name] = rotation
+    return FeatureDf
+
+
+def MatchItem_marketmoney_ipo(IPOcoms, FeatureDf, TargetDf, name,num):
+    """
+    IPO상장기업에 대해서 특정날(indexer)에 찾고자하는 지표(finding)을 TargetDf에서 찾은뒤 FeatureDf에 indexer날에 넣어줌
+    """
+    FeatureDf[name] = np.nan
+    for i in IPOcoms:
+        IPOday = FeatureDf.loc[i,'상장일']
+        day_1 = str(parse(IPOday).date() + relativedelta(months = num))
+        ## 거래대금
+        money = TargetDf.loc['거래대금',IPOday:day_1].sum()
+        ## 시가총액
+        mean_all = TargetDf.loc['시가총액',IPOday:day_1].mean()
+        ## 회전율
+        rotation = (money/mean_all)*100
+        FeatureDf.loc[i,name] = rotation
+    return FeatureDf
+
+
+def MatchItem_Market_1_3(IPOcoms, FeatureDf, TargetDf, finding , second):
+    """
+    Market에서 특정 변수들 1년전 대비 1달 전 가격 넣어주는 함수
     """
     FeatureDf[finding] = np.nan
      
     for i in IPOcoms:
-        IPOday = FeatureDf.loc[i,indexer]
-        month_3 = str((parse(IPOday) + relativedelta(months= 3)).date())
-        month_1 = str((parse(IPOday) + relativedelta(months = 1)).date())
-        month_v = float(TargetDf.loc[second,month_3])
-        year_v = float(TargetDf.loc[second,month_1])
+        IPOday = FeatureDf.loc[i,'상장일']
+        year = str((parse(IPOday) - relativedelta(years= 1)).date())
+        month = str((parse(IPOday) - relativedelta(months = 1)).date())
+        month_v = float(TargetDf.loc[second,month])
+        year_v = float(TargetDf.loc[second,year])
         per = (month_v - year_v)/year_v
+        FeatureDf.loc[i,finding] = per
+    return FeatureDf
+
+
+def MatchItem_Market_ipo(IPOcoms, FeatureDf, TargetDf, finding , standard,num):
+    """
+    Market에서 특정 변수들 상장일 대비 몇개월후 넣어주는 함수
+    """
+    FeatureDf[finding] = np.nan
+     
+    for i in IPOcoms:
+        IPOday = FeatureDf.loc[i,'상장일']
+        month = str((parse(IPOday) + relativedelta(months=num)).date())
+
+        month_v = float(TargetDf.loc[standard,month])
+        year_v = float(TargetDf.loc[standard,IPOday])
+        per = (month_v - year_v)/year_v
+        FeatureDf.loc[i,finding] = per
+    return FeatureDf
+
+
+def MatchItem_interest(IPOcoms, FeatureDf, TargetDf,finding , standard):
+    """
+    상장일 기준 국고3년금리
+    """
+    FeatureDf[finding] = np.nan
+     
+    for i in IPOcoms:
+        IPOday = FeatureDf.loc[i,'상장일']
+        per =  TargetDf.loc[standard,str(IPOday)]
+       
         FeatureDf.loc[i,finding] = per
     return FeatureDf
 
@@ -254,7 +349,6 @@ def return_rate(IPOcoms,FeatureDf,TargetDf,name,num):
         return_rate = (new_price - pre_price)/pre_price
         FeatureDf.loc[i,name] = return_rate
     return FeatureDf
-
 
 
 def rate_month_to_month(IPOcoms, FeatureDf, TargetDf, name, num_first, num_second):

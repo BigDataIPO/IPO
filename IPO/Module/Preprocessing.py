@@ -39,7 +39,7 @@ def FeatureDf_processing(FeatureDf):
     # 데이터 삭제를 위한 종목명으로 인덱스 설정
     FeatureDf.set_index(["Name","Item"],inplace= True)
 
-     return FeatureDf
+    return FeatureDf
 
 
 # ## 파이낸스 변수 추가
@@ -389,9 +389,26 @@ def scoring(x):
     else :
         return 5
 
+def calUp(Series):
+    deltas = [0]
+    for i in range(len(Series)-1):
+        delta = (Series[i+1] - Series[i]) / Series[i]
+        deltas.append(delta)
+    return deltas
+    
+def CutSize(df, col):
+    # 일단 3등분만 할 것 같아서 이렇게 만듬. 여러개면 switch 함수를 따로 만들고 리스트로 quantile 받기
+    Cuts = []
+    Cuts.append(df[col].quantile(0)-1)
+    Cuts.append(df[col].quantile(0.3))
+    Cuts.append(df[col].quantile(0.7))
+    Cuts.append(df[col].quantile(1)+1)
+    labels = [1,2,3]
+    return pd.cut(df[col],Cuts, labels = labels)
 
 # ## 변수 위치 재설정
 
+"""
 test = test[['상장유형',
  '공모가(원)',
  '상장일',
@@ -502,3 +519,4 @@ test.columns = [['IPO']*5 + ['Finance']*23 + ['Trading']*14 + ['Market']*9 ,\
  '국고5년시장금리%p']]
 
 # > 엑셀 불러오면 멀티인덱스 풀리기에 불러온 뒤 멀티인덱스 편하게 설정하는 방법 찾기
+"""

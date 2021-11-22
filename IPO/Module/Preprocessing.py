@@ -5,7 +5,7 @@ from dateutil.relativedelta import relativedelta
 from datetime import datetime
 from dateutil.parser import parse
 import pickle
-
+import copy
 
 # +
 def ipo_processing(ipo):
@@ -406,6 +406,14 @@ def CutSize(df, col):
     labels = [1,2,3]
     return pd.cut(df[col],Cuts, labels = labels)
 
+def Cut(Series , cuts):
+    "구분할 iter가능한 변수와 구분 기준을 입력받으면 구분 기준 앞에서 부터 1로 구분해서 return 함"
+    Cuts = copy.deepcopy(cuts)
+    Cuts.append(np.inf)
+    Cuts.insert(0,-1*np.inf)
+    R = len(Cuts)
+    label = range(1,R)
+    return pd.cut(Series, Cuts, labels = label)
 # ## 변수 위치 재설정
 
 """

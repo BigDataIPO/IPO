@@ -395,7 +395,7 @@ def calUp(Series):
         delta = (Series[i+1] - Series[i]) / Series[i]
         deltas.append(delta)
     return deltas
-    
+
 def CutSize(df, col):
     # 일단 3등분만 할 것 같아서 이렇게 만듬. 여러개면 switch 함수를 따로 만들고 리스트로 quantile 받기
     Cuts = []

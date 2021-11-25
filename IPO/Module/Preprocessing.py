@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# +
 import pandas as pd
 import numpy as np
 from dateutil.relativedelta import relativedelta
@@ -6,6 +7,20 @@ from datetime import datetime
 from dateutil.parser import parse
 import pickle
 import copy
+
+#시각화
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+##도구들
+from sklearn.model_selection import train_test_split
+from sklearn.model_selection import KFold, StratifiedKFold
+from sklearn.metrics import *
+from sklearn.metrics import accuracy_score, confusion_matrix, log_loss
+
+##알고리즘 
+from sklearn.ensemble import RandomForestClassifier
+from xgboost import XGBClassifier
 
 # +
 def ipo_processing(ipo):
@@ -415,6 +430,145 @@ def Cut(Series , cuts):
     label = range(1,R)
     return pd.cut(Series, Cuts, labels = label)
 # ## 변수 위치 재설정
+
+# ## 모델별 y_data 분포
+
+def process(df,y_name):
+    
+    ## 기본 전처리
+    df['상장일'] = pd.to_datetime(df['상장일'])
+    df = df.set_index(['상장일'])
+    df = df.drop(['종목명','공모 시가총액'],axis = 1) ## 나중에 카테고리 진행할려면 남겨줄 것
+    if y_name == '공모가 대비 6개월 수익률':
+        df['Cat'] = Cut(df[y_name],[-0.4, -0.2, 0.2, 0.4])
+        df = df.drop(y_name,axis = 1)
+        
+    else :
+        df['Cat'] = Cut(df[y_name],[-0.2, -0.1, 0.1, 0.2])
+        df = df.drop(y_name,axis = 1)
+    
+    ## train 3년 test 1년으로 총 기간을 3개월 이동으로 36개 구간분할
+    train_list = []
+    test_list = []
+    train_start_date = '2009-04-01' ## 기한은 나중에 변경할수도
+    test_start_date = parse(str(train_start_date)).date() + relativedelta(years =3)
+    train_end_date = parse(str(test_start_date)).date() - relativedelta(days =1)
+    test_end_date = parse(str(train_end_date)).date() + relativedelta(years =1)
+
+    while True:
+
+        train_list.append(df[train_start_date : train_end_date])
+        test_list.append(df[test_start_date : test_end_date])
+
+        train_start_date = parse(str(train_start_date)).date() + relativedelta(months=3)
+        test_start_date = parse(str(test_start_date)).date() + relativedelta(months=3)
+        train_end_date = parse(str(train_end_date)).date() + relativedelta(months=3)
+        test_end_date = parse(str(test_end_date)).date() + relativedelta(months=3)
+
+        if str(train_start_date) == '2018-04-01':
+            break
+    
+    ## y_data 분포 확인 및 데이터프레임 생성
+    df_1 = train_list[0]['Cat'].value_counts().reindex([1,2,3,4,5])
+    df_2 = test_list[0]['Cat'].value_counts().reindex([1,2,3,4,5])
+    df_y = pd.concat([df_1,df_2])
+    
+    
+    for i in range(1,len(train_list)):
+        a = train_list[i]['Cat'].value_counts().reindex([1,2,3,4,5])
+        b = test_list[i]['Cat'].value_counts().reindex([1,2,3,4,5])
+    
+        new_data = pd.concat([a,b] ,axis =0)
+        df_y = pd.concat([df_y,new_data],axis =1)
+        
+    df_y.columns = list(range(0,36))
+    df_y.index = ['Train_1','Train_2','Train_3','Train_4','Train_5',\
+              'Test_1','Test_2','Test_3','Test_4','Test_5']
+    df_y.rename(columns = lambda x : "model_set_"+ str(x),inplace = True)
+    
+    return df_y
+
+
+# ## 모델별 평가점수 , feature 값 , y_data(리스트로 담겨있음)
+
+def process_final(df,y_name):
+    
+    ## 기본 전처리
+    df['상장일'] = pd.to_datetime(df['상장일'])
+    df = df.set_index(['상장일'])
+    df = df.drop(['종목명','공모 시가총액'],axis = 1) ## 나중에 카테고리 진행할려면 남겨줄 것
+    if y_name == '공모가 대비 6개월 수익률':
+        df['Cat'] = Cut(df[y_name],[-0.4, -0.2, 0.2, 0.4])
+       
+        
+    else :
+        df['Cat'] = Cut(df[y_name],[-0.2, -0.1, 0.1, 0.2])
+       
+    
+    ## train 3년 test 1년으로 총 기간을 3개월 이동으로 36개 구간분할
+    train_list = []
+    test_list = []
+    train_start_date = '2009-04-01' ## 기한은 나중에 변경할수도
+    test_start_date = parse(str(train_start_date)).date() + relativedelta(years =3)
+    train_end_date = parse(str(test_start_date)).date() - relativedelta(days =1)
+    test_end_date = parse(str(train_end_date)).date() + relativedelta(years =1)
+
+    while True:
+
+        train_list.append(df[train_start_date : train_end_date])
+        test_list.append(df[test_start_date : test_end_date])
+
+        train_start_date = parse(str(train_start_date)).date() + relativedelta(months=3)
+        test_start_date = parse(str(test_start_date)).date() + relativedelta(months=3)
+        train_end_date = parse(str(train_end_date)).date() + relativedelta(months=3)
+        test_end_date = parse(str(test_end_date)).date() + relativedelta(months=3)
+
+        if str(train_start_date) == '2018-04-01':
+            break
+            
+    y_data = []
+    score_list = []
+    feature_list = []
+
+    for i in range(0,len(train_list)):
+        X_train = train_list[i].drop([y_name,'Cat'],axis =1)
+        y_train = train_list[i]['Cat']
+        X_test = test_list[i].drop([y_name,'Cat'],axis =1)
+        y_test = test_list[i]['Cat']
+
+            # 랜덤 포레스트 학습 및 별도의 테스트 셋으로 예측 성능 평가
+        clf = RandomForestClassifier(random_state=0 , max_depth = 10 , min_samples_leaf = 4 ,\
+                                    min_samples_split =  4 , n_estimators = 400)
+
+        clf.fit(X_train , y_train)
+        train_pred = clf.predict(X_train)
+        test_pred = clf.predict(X_test)
+
+        # 성과 평가
+        train_res = get_clf_eval(y_train, train_pred)
+        test_res = get_clf_eval(y_test,test_pred)
+        res = train_res + test_res
+
+
+        #feature_importance
+        feature_importance = clf.feature_importances_
+
+
+        pred_value = pd.Series(test_pred,index = y_test.index)
+        per = test_list[i][y_name]
+        y_testdata = pd.concat([per,y_test,pred_value] , axis = 1)
+        y_testdata.columns = ['실제 y 수익률','실제 y라벨링','예측 y 라벨링']
+
+        score_list.append(res)
+        feature_list.append(feature_importance)
+        y_data.append(y_testdata)   
+    df_score = pd.DataFrame(score_list,columns = ["정확도","정밀도","재현율","f1_score"]*2).T 
+    df_score.rename(columns = lambda x : "model_set_"+ str(x),inplace = True)
+
+    df_feature = pd.DataFrame(feature_list,columns = X_train.columns).T 
+    df_feature.rename(columns = lambda x : "model_set_"+ str(x),inplace = True)
+        
+    return df_score , df_feature , y_data
 
 """
 test = test[['상장유형',

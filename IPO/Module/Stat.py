@@ -43,3 +43,27 @@ def get_clf_eval(y_test, pred=None, pred_proba=None):
     print('정확도(accuracy): {0:.4f}, 정밀도(precision): {1:.4f}, 재현율(recall): {2:.4f}, f1_score: {3:.4f}'.format(accuracy, precision, recall, f1))
     
     return [accuracy, precision, recall, f1]
+
+from scipy import stats
+def Ttest(x,y, Number = 0 , leftstr = "", rightstr= "", Measure = ""):
+    print(str(Number)+"\t"+leftstr + " & " + rightstr + "\tMeasure : " + Measure + "\n")
+    _stat,_pvalue = stats.levene(x,y)
+    print("LeveneResult -- stat : %3f, p-value : %3f \n" %(_stat, _pvalue))
+    if _pvalue < 0.05:
+        equal_Var = False
+    else :
+        equal_Var = True
+    print(equal_Var)
+    statistic , pvalue = stats.ttest_ind(x,y, equal_var= equal_Var,alternative='greater')
+    print("\nstatistic : %d , pvalue : %.7f\n" % (statistic, pvalue))
+    return (statistic, pvalue)
+
+def sign(pval):
+    if(pval <= 0.01):
+        return "***"
+    elif(pval <= 0.05):
+        return "**"
+    elif(pval<= 0.1):
+        return "*"
+    else:
+        return ""

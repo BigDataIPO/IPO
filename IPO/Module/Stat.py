@@ -35,7 +35,7 @@ def Ttest(x,y, Number = 0 , leftstr = "", rightstr= "", Measure = ""):
     else :
         equal_Var = True
     print(equal_Var)
-    statistic , pvalue = stats.ttest_ind(x,y, equal_var= equal_Var,alternative='greater')
+    statistic , pvalue = stats.ttest_ind(x,y, equal_var= equal_Var)
     print("\nstatistic : %d , pvalue : %.7f\n" % (statistic, pvalue))
     return (statistic, pvalue)
 
@@ -60,12 +60,5 @@ def get_clf_eval(y_test, y_data, pred=None, pred_proba=None):
     
 #     print('정확도(accuracy): {0:.4f}, 정밀도(precision): {1:.4f}, 재현율(recall): {2:.4f}, f1_score: {3:.4f}'.format(accuracy, precision, recall, f1))
     
-#     confusion = confusion_matrix(y_test, pred) 
-#     accuracy = accuracy_score(y_test, pred) 
-#     precision = precision_score(y_test, pred , average= 'macro') 
-#     recall = recall_score(y_test, pred , average= 'macro') 
-#     f1 = f1_score(y_test, pred , average= 'macro') 
-    
-#     print('정확도(accuracy): {0:.4f}, 정밀도(precision): {1:.4f}, 재현율(recall): {2:.4f}, f1_score: {3:.4f}'.format(accuracy, precision, recall, f1))
-    
+
     return [accuracy, precision, recall, f1]

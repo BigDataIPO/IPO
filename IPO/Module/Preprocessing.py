@@ -70,16 +70,16 @@ def MatchItem_finance(IPOcoms, FeatureDf, TargetDf, indexer, finding):
     for i in IPOcoms:
         IPOday = FeatureDf.loc[i,indexer]
         if parse(IPOday).date().month < 4:
-            IPOday= datetime(parse(IPOday).year,12,31).date()\
-            -relativedelta(years = 2)
+            IPOday= datetime(parse(IPOday).year,12,31).date() - \
+            relativedelta(years = 2)
         else :
-            IPOday= datetime(parse(IPOday).year,12,31).date()\
-            - relativedelta(years = 1)
+            IPOday= datetime(parse(IPOday).year,12,31).date() - \
+            relativedelta(years = 1)
         Adj_price = TargetDf.loc[(i,finding),str(IPOday)]
-        FeatureDf.loc[i,finding] = Adj_price[0]
+        FeatureDf.loc[i,finding] = Adj_price
     return FeatureDf
 
-def Matchitem_New(FeatureDF):
+def Matchitem_New(FeatureDF,ipo):
     """
     finance에 있는 변수마다 ipo 파일 옆에 붙여주기
     
@@ -88,9 +88,8 @@ def Matchitem_New(FeatureDF):
     New_coms = FeatureDF.reset_index(drop = False , inplace = False)
     New_coms = list(New_coms['Item'].dropna().unique())
     for i in New_coms:
-        Train_data = MatchItem_finance(IPOcoms,ipo,FeatureDF,'상장일',i) ## 
+        Train_data = MatchItem_finance(IPOcoms,ipo,FeatureDF,'상장일',i)
     return Train_data
-
 
 
 # -
@@ -111,7 +110,7 @@ def MatchItem(IPOcoms, FeatureDf, TargetDf, indexer, finding):
 
 
 # +
-def MatchItem_month(IPOcoms, FeatureDf, TargetDf, indexer, finding , month_index , month ):
+def MatchItem_month(FeatureDf, TargetDf, indexer, finding , month_index , month ):
     """
     IPO상장기업에 대해서 특정날(indexer)에 찾고자하는 지표(finding)을 TargetDf에서 찾은뒤 FeatureDf에 indexer날에 넣어줌
     상장 후 1달,3달,6달 후 수정주가 넣음
@@ -131,10 +130,12 @@ def MatchItem_month(IPOcoms, FeatureDf, TargetDf, indexer, finding , month_index
 
 # -
 
-def MatchItem_per(IPOcoms, FeatureDf, finding ,num):
+def MatchItem_per(FeatureDf, finding ,num,trading,stock,finance):
     """
-    per/pbr/ev 등등 구하기
+    공모가 대비 PER 구하기
+    
     """
+    IPOcoms = FeatureDf.index
     FeatureDf[finding] = np.nan
     for i in IPOcoms:
         IPOday = FeatureDf.loc[i,'상장일']
@@ -156,10 +157,36 @@ def MatchItem_per(IPOcoms, FeatureDf, finding ,num):
     return FeatureDf
 
 
-def MatchItem_pbr(IPOcoms, FeatureDf, finding ,num):
+def MatchItem_endper(FeatureDf,finding,trading,stock,finance):
     """
-    per/pbr/ev 등등 구하기
+    종가 대비 per 구하기
     """
+    IPOcoms = FeatureDf.index
+    FeatureDf[finding] = np.nan
+    for i in IPOcoms:
+        IPOday = FeatureDf.loc[i,'상장일']
+        
+        if parse(IPOday).date().month < 4:
+            day= datetime(parse(IPOday).year,12,31).date() - \
+            relativedelta(years = 2)
+        else :
+            day = datetime(parse(IPOday).year,12,31).date() - \
+            relativedelta(years = 1)
+            
+        num_1 = trading.loc[(i,'종가'),IPOday]
+        num_2 = stock.loc[i,IPOday][0]
+        num_3 = finance.loc[(i,'당기순이익'),str(day)]
+        
+        per = (num_1*num_2)/(num_3*1000)
+        FeatureDf.loc[i,finding] = per
+    return FeatureDf
+
+
+def MatchItem_pbr(FeatureDf, finding ,num,trading,stock,finance):
+    """
+    공모가 대비 PBR 구하기
+    """
+    IPOcoms = FeatureDf.index
     FeatureDf[finding] = np.nan
     for i in IPOcoms:
         IPOday = FeatureDf.loc[i,'상장일']
@@ -181,10 +208,38 @@ def MatchItem_pbr(IPOcoms, FeatureDf, finding ,num):
     return FeatureDf
 
 
-def MatchItem_ev(IPOcoms, FeatureDf, finding ,num):
+def MatchItem_endpbr( FeatureDf, finding,trading,stock,finance):
     """
-    per/pbr/ev 등등 구하기
+    종가 대비 pbr 구하기
     """
+    IPOcoms = FeatureDf.index
+    FeatureDf[finding] = np.nan
+    for i in IPOcoms:
+        IPOday = FeatureDf.loc[i,'상장일']
+        
+        
+        if parse(IPOday).date().month < 4:
+            day= datetime(parse(IPOday).year,12,31).date() - \
+            relativedelta(years = 2)
+        else :
+            day = datetime(parse(IPOday).year,12,31).date() - \
+            relativedelta(years = 1)
+            
+        num_1 = trading.loc[(i,'종가'),IPOday]
+        num_2 = stock.loc[i,IPOday][0]
+        num_3 = finance.loc[(i,'자본총계'),str(day)]
+        
+        pbr = (num_1*num_2)/(num_3*1000)
+        FeatureDf.loc[i,finding] = pbr
+    return FeatureDf
+
+
+def MatchItem_ev(FeatureDf, finding ,num,trading,stock,finance):
+    """
+    
+    공모가 대비 EV/EBITDA 구하기
+    """
+    IPOcoms = FeatureDf.index
     FeatureDf[finding] = np.nan
     for i in IPOcoms:
         IPOday = FeatureDf.loc[i,'상장일']
@@ -207,10 +262,38 @@ def MatchItem_ev(IPOcoms, FeatureDf, finding ,num):
     return FeatureDf
 
 
-def MatchItem_mean(IPOcoms, FeatureDf, TargetDf, indexer, finding , name, num):
+def MatchItem_endev(FeatureDf, finding,trading,stock,finance):
     """
-    IPO상장기업에 대해서 특정날(indexer)에 찾고자하는 지표(finding)을 TargetDf에서 찾은뒤 FeatureDf에 indexer날에 넣어줌
+    종가 대비 ev/ebitda 구하기
     """
+    IPOcoms = FeatureDf.index
+    FeatureDf[finding] = np.nan
+    for i in IPOcoms:
+        IPOday = FeatureDf.loc[i,'상장일']
+
+        
+        if parse(IPOday).date().month < 4:
+            day= datetime(parse(IPOday).year,12,31).date() - \
+            relativedelta(years = 2)
+        else :
+            day = datetime(parse(IPOday).year,12,31).date() - \
+            relativedelta(years = 1)
+            
+        num_1 = trading.loc[(i,'종가'),IPOday]
+        num_2 = stock.loc[i,IPOday][0]
+        num_3 = finance.loc[(i,'순부채'),str(day)]
+        num_4 = finance.loc[(i,'EBITDA2'),str(day)]
+        
+        ebitda = (num_1*num_2 + num_3*1000)/(num_4*1000)
+        FeatureDf.loc[i,finding] = ebitda
+    return FeatureDf
+
+
+def MatchItem_mean(FeatureDf, TargetDf, indexer, finding , name, num):
+    """
+    상장일 부터 해당 월까지의 평균 값
+    """
+    IPOcoms = FeatureDf.index
     FeatureDf[name] = np.nan
     for i in IPOcoms:
         IPOday = FeatureDf.loc[i,indexer]
@@ -222,11 +305,11 @@ def MatchItem_mean(IPOcoms, FeatureDf, TargetDf, indexer, finding , name, num):
     return FeatureDf
 
 
-
-def MatchItem_rotation(IPOcoms, FeatureDf, TargetDf, indexer, finding_1,finding_2, name, num):
+def MatchItem_rotation(FeatureDf, TargetDf, indexer, finding_1,finding_2, name, num):
     """
-    IPO상장기업에 대해서 특정날(indexer)에 찾고자하는 지표(finding)을 TargetDf에서 찾은뒤 FeatureDf에 indexer날에 넣어줌
+    시가총액 회전율 구하기
     """
+    IPOcoms = FeatureDf.index
     FeatureDf[name] = np.nan
     for i in IPOcoms:
         IPOday = FeatureDf.loc[i,indexer]
@@ -242,9 +325,9 @@ def MatchItem_rotation(IPOcoms, FeatureDf, TargetDf, indexer, finding_1,finding_
     return FeatureDf
 
 
-def MatchItem_month(IPOcoms, FeatureDf, TargetDf, indexer, finding , month_index , month ):
+def MatchItem_month(FeatureDf, TargetDf, indexer, finding , month_index , month ):
     """
-    IPO상장기업에 대해서 특정날(indexer)에 찾고자하는 지표(finding)을 TargetDf에서 찾은뒤 FeatureDf에 indexer날에 넣어줌
+    특정 몇개월 뒤의 값 구하기
     """
     IPOcoms = FeatureDf.index
     FeatureDf[month_index + '' + finding] = np.nan
@@ -259,10 +342,11 @@ def MatchItem_month(IPOcoms, FeatureDf, TargetDf, indexer, finding , month_index
 
 # ## 시장변수
 
-def MatchItem_marketmoney(IPOcoms, FeatureDf, TargetDf, name):
+def MatchItem_marketmoney(FeatureDf, TargetDf, name):
     """
-    IPO상장기업에 대해서 특정날(indexer)에 찾고자하는 지표(finding)을 TargetDf에서 찾은뒤 FeatureDf에 indexer날에 넣어줌
+    특정 두 기간 사이의 시장 회전율 구하기
     """
+    IPOcoms = FeatureDf.index
     FeatureDf[name] = np.nan
     for i in IPOcoms:
         IPOday = FeatureDf.loc[i,'상장일']
@@ -278,10 +362,11 @@ def MatchItem_marketmoney(IPOcoms, FeatureDf, TargetDf, name):
     return FeatureDf
 
 
-def MatchItem_marketmoney_ipo(IPOcoms, FeatureDf, TargetDf, name,num):
+def MatchItem_marketmoney_ipo(FeatureDf, TargetDf, name,num):
     """
-    IPO상장기업에 대해서 특정날(indexer)에 찾고자하는 지표(finding)을 TargetDf에서 찾은뒤 FeatureDf에 indexer날에 넣어줌
+    상장일 부터 특정 기간 사이의 시장 회전율 구하기
     """
+    IPOcoms = FeatureDf.index
     FeatureDf[name] = np.nan
     for i in IPOcoms:
         IPOday = FeatureDf.loc[i,'상장일']
@@ -296,10 +381,11 @@ def MatchItem_marketmoney_ipo(IPOcoms, FeatureDf, TargetDf, name,num):
     return FeatureDf
 
 
-def MatchItem_Market_1_3(IPOcoms, FeatureDf, TargetDf, finding , second):
+def MatchItem_Market_1_3(FeatureDf, TargetDf, finding , second):
     """
     Market에서 특정 변수들 1년전 대비 1달 전 가격 넣어주는 함수
     """
+    IPOcoms = FeatureDf.index
     FeatureDf[finding] = np.nan
      
     for i in IPOcoms:
@@ -313,10 +399,11 @@ def MatchItem_Market_1_3(IPOcoms, FeatureDf, TargetDf, finding , second):
     return FeatureDf
 
 
-def MatchItem_Market_ipo(IPOcoms, FeatureDf, TargetDf, finding , standard,num):
+def MatchItem_Market_ipo(FeatureDf, TargetDf, finding , standard,num):
     """
     Market에서 특정 변수들 상장일 대비 몇개월후 넣어주는 함수
     """
+    IPOcoms = FeatureDf.index
     FeatureDf[finding] = np.nan
      
     for i in IPOcoms:
@@ -330,10 +417,11 @@ def MatchItem_Market_ipo(IPOcoms, FeatureDf, TargetDf, finding , standard,num):
     return FeatureDf
 
 
-def MatchItem_interest(IPOcoms, FeatureDf, TargetDf,finding , standard):
+def MatchItem_interest(FeatureDf, TargetDf,finding , standard):
     """
     상장일 기준 국고3년금리
     """
+    IPOcoms = FeatureDf.index
     FeatureDf[finding] = np.nan
      
     for i in IPOcoms:
@@ -346,11 +434,11 @@ def MatchItem_interest(IPOcoms, FeatureDf, TargetDf,finding , standard):
 
 # ## 종속변수
 
-def return_rate(IPOcoms,FeatureDf,TargetDf,name,num):
+def return_rate(FeatureDf,TargetDf,name,num):
     """
-    공모가 대비 1,3,6 수익률 계산
+    공모가 대비 1,3,6개월 수익률 계산
     """
-    
+    IPOcoms = FeatureDf.index
     FeatureDf[name] = np.nan
     for i in IPOcoms:
         IPOday = FeatureDf.loc[i,'상장일']
@@ -366,12 +454,32 @@ def return_rate(IPOcoms,FeatureDf,TargetDf,name,num):
     return FeatureDf
 
 
-def rate_month_to_month(IPOcoms, FeatureDf, TargetDf, name, num_first, num_second):
+def return_rate_new(FeatureDf,TargetDf,name,num):
+    """
+    종가 대비 1,3,6개월 수익률
+    """
+    IPOcoms = FeatureDf.index
+    FeatureDf[name] = np.nan
+    for i in IPOcoms:
+        IPOday = FeatureDf.loc[i,'상장일']
+        month = parse(IPOday).date() + relativedelta(months = num)
+        month = str(month)
+        ## 몇 개월 뒤 종가
+        new_price = TargetDf.loc[(i,'종가'),month]
+        ## 상장일 종가
+        pre_price = TargetDf.loc[(i,'종가'),IPOday]
+        ## 수익률
+        return_rate = (new_price - pre_price)/pre_price
+        FeatureDf.loc[i,name] = return_rate
+    return FeatureDf
+
+
+def rate_month_to_month(FeatureDf, TargetDf, name, num_first, num_second):
     """
     1_3 수익률 , 3_6 수익률 계산
     """
     FeatureDf[name] = np.nan
-     
+    IPOcoms = FeatureDf.index
     for i in IPOcoms:
         IPOday = FeatureDf.loc[i,'상장일']
         first_m = str(parse(IPOday).date() + relativedelta(months = num_first))
@@ -388,21 +496,6 @@ def rate_month_to_month(IPOcoms, FeatureDf, TargetDf, name, num_first, num_secon
                        
     return FeatureDf
 
-
-def scoring(x):
-    """
-    카테고리화 예시
-    """
-    if x <  -0.40:
-        return 1
-    elif x < -0.20:
-        return 2
-    elif x < 0 :
-        return 3
-    elif x < 0.20:
-        return 4
-    else :
-        return 5
 
 def calUp(Series):
     deltas = [0]
@@ -437,6 +530,7 @@ def MatchItem_per_new(IPOcoms, FeatureDf, finding):
     """
     per/pbr/ev 등등 구하기
     """
+    IPOcoms = FeatureDf.index
     FeatureDf[finding] = np.nan
     for i in IPOcoms:
         IPOday = FeatureDf.loc[i,'상장일']
@@ -459,8 +553,10 @@ def MatchItem_per_new(IPOcoms, FeatureDf, finding):
 
 def MatchItem_pbr_new(IPOcoms, FeatureDf, finding):
     """
+    
     per/pbr/ev 등등 구하기
     """
+    IPOcoms = FeatureDf.index
     FeatureDf[finding] = np.nan
     for i in IPOcoms:
         IPOday = FeatureDf.loc[i,'상장일']
@@ -486,6 +582,7 @@ def MatchItem_ev_new(IPOcoms, FeatureDf, finding):
     """
     per/pbr/ev 등등 구하기
     """
+    IPOcoms = FeatureDf.index
     FeatureDf[finding] = np.nan
     for i in IPOcoms:
         IPOday = FeatureDf.loc[i,'상장일']
@@ -517,18 +614,18 @@ def process(df,y_name):
     df = df.set_index(['상장일'])
     df = df.drop(['종목명','공모 시가총액'],axis = 1) ## 나중에 카테고리 진행할려면 남겨줄 것
     if y_name == '공모가 대비 6개월 수익률':
-        df['Cat'] = Cut(df[y_name],[-0.4, -0.2, 0.2, 0.4])
+        df['Cat'] = Cut(df[y_name],[ -0.2, 0.2, 0.4])
         df = df.drop(y_name,axis = 1)
         
     else :
-        df['Cat'] = Cut(df[y_name],[-0.2, -0.1, 0.1, 0.2])
+        df['Cat'] = Cut(df[y_name],[-0.1, 0.1, 0.2])
         df = df.drop(y_name,axis = 1)
     
-    ## train 3년 test 1년으로 총 기간을 3개월 이동으로 36개 구간분할
+    ## train 4년 test 1년으로 총 기간을 3개월 이동으로 32개 구간분할
     train_list = []
     test_list = []
-    train_start_date = '2009-04-01' ## 기한은 나중에 변경할수도
-    test_start_date = parse(str(train_start_date)).date() + relativedelta(years =3)
+    train_start_date = '2009-04-01' 
+    test_start_date = parse(str(train_start_date)).date() + relativedelta(years =4)
     train_end_date = parse(str(test_start_date)).date() - relativedelta(days =1)
     test_end_date = parse(str(train_end_date)).date() + relativedelta(years =1)
 
@@ -542,221 +639,25 @@ def process(df,y_name):
         train_end_date = parse(str(train_end_date)).date() + relativedelta(months=3)
         test_end_date = parse(str(test_end_date)).date() + relativedelta(months=3)
 
-        if str(train_start_date) == '2018-04-01':
+        if str(train_start_date) == '2017-04-01':
             break
     
     ## y_data 분포 확인 및 데이터프레임 생성
-    df_1 = train_list[0]['Cat'].value_counts().reindex([1,2,3,4,5])
-    df_2 = test_list[0]['Cat'].value_counts().reindex([1,2,3,4,5])
+    df_1 = train_list[0]['Cat'].value_counts().reindex([1,2,3,4])
+    df_2 = test_list[0]['Cat'].value_counts().reindex([1,2,3,4])
     df_y = pd.concat([df_1,df_2])
     
     
     for i in range(1,len(train_list)):
-        a = train_list[i]['Cat'].value_counts().reindex([1,2,3,4,5])
-        b = test_list[i]['Cat'].value_counts().reindex([1,2,3,4,5])
+        a = train_list[i]['Cat'].value_counts().reindex([1,2,3,4])
+        b = test_list[i]['Cat'].value_counts().reindex([1,2,3,4])
     
         new_data = pd.concat([a,b] ,axis =0)
         df_y = pd.concat([df_y,new_data],axis =1)
         
-    df_y.columns = list(range(0,36))
-    df_y.index = ['Train_1','Train_2','Train_3','Train_4','Train_5',\
-              'Test_1','Test_2','Test_3','Test_4','Test_5']
+    df_y.columns = list(range(len(train_list)))
+    df_y.index = ['Train_1','Train_2','Train_3','Train_4',\
+              'Test_1','Test_2','Test_3','Test_4']
     df_y.rename(columns = lambda x : "model_set_"+ str(x),inplace = True)
     
     return df_y
-
-
-# ## 모델별 평가점수 , feature 값 , y_data(리스트로 담겨있음)
-
-def process_final(df,y_name):
-    
-    ## 기본 전처리
-    df['상장일'] = pd.to_datetime(df['상장일'])
-    df = df.set_index(['상장일'])
-    df = df.drop(['종목명','공모 시가총액'],axis = 1) ## 나중에 카테고리 진행할려면 남겨줄 것
-    if y_name == '공모가 대비 6개월 수익률':
-        df['Cat'] = Cut(df[y_name],[-0.4, -0.2, 0.2, 0.4])
-       
-        
-    else :
-        df['Cat'] = Cut(df[y_name],[-0.2, -0.1, 0.1, 0.2])
-       
-    
-    ## train 3년 test 1년으로 총 기간을 3개월 이동으로 36개 구간분할
-    train_list = []
-    test_list = []
-    train_start_date = '2009-04-01' ## 기한은 나중에 변경할수도
-    test_start_date = parse(str(train_start_date)).date() + relativedelta(years =3)
-    train_end_date = parse(str(test_start_date)).date() - relativedelta(days =1)
-    test_end_date = parse(str(train_end_date)).date() + relativedelta(years =1)
-
-    while True:
-
-        train_list.append(df[train_start_date : train_end_date])
-        test_list.append(df[test_start_date : test_end_date])
-
-        train_start_date = parse(str(train_start_date)).date() + relativedelta(months=3)
-        test_start_date = parse(str(test_start_date)).date() + relativedelta(months=3)
-        train_end_date = parse(str(train_end_date)).date() + relativedelta(months=3)
-        test_end_date = parse(str(test_end_date)).date() + relativedelta(months=3)
-
-        if str(train_start_date) == '2018-04-01':
-            break
-            
-    y_data = []
-    score_list = []
-    feature_list = []
-
-    for i in range(0,len(train_list)):
-        X_train = train_list[i].drop([y_name,'Cat'],axis =1)
-        y_train = train_list[i]['Cat']
-        X_test = test_list[i].drop([y_name,'Cat'],axis =1)
-        y_test = test_list[i]['Cat']
-
-            # 랜덤 포레스트 학습 및 별도의 테스트 셋으로 예측 성능 평가
-        clf = RandomForestClassifier(random_state=0 , max_depth = 10 , min_samples_leaf = 4 ,\
-                                    min_samples_split =  4 , n_estimators = 400)
-
-        clf.fit(X_train , y_train)
-        train_pred = clf.predict(X_train)
-        test_pred = clf.predict(X_test)
-
-        # 성과 평가
-        train_res = get_clf_eval(y_train, train_pred)
-        test_res = get_clf_eval(y_test,test_pred)
-        res = train_res + test_res
-
-
-        #feature_importance
-        feature_importance = clf.feature_importances_
-
-
-        pred_value = pd.Series(test_pred,index = y_test.index)
-        per = test_list[i][y_name]
-        y_testdata = pd.concat([per,y_test,pred_value] , axis = 1)
-        y_testdata.columns = ['실제 y 수익률','실제 y라벨링','예측 y 라벨링']
-
-        score_list.append(res)
-        feature_list.append(feature_importance)
-        y_data.append(y_testdata)   
-    df_score = pd.DataFrame(score_list,columns = ["정확도","정밀도","재현율","f1_score"]*2).T 
-    df_score.rename(columns = lambda x : "model_set_"+ str(x),inplace = True)
-
-    df_feature = pd.DataFrame(feature_list,columns = X_train.columns).T 
-    df_feature.rename(columns = lambda x : "model_set_"+ str(x),inplace = True)
-        
-    return df_score , df_feature , y_data
-
-# +
-# """
-# test = test[['상장유형',
-#  '공모가(원)',
-#  '상장일',
-#  '상장주식수',
-#  'IPO시가총액',
-#  '매출총이익률',
-#  '영업이익률',
-#  'ROE(지배)',
-#  '매출액증가율(YoY)',
-#  '영업이익증가율(YoY)',
-#  '매출액증가율(YoY)-before',
-#  '영업이익증가율(YoY)-before',
-#  '유동비율',
-#  '당좌비율',
-#  '부채비율',
-#  '이자보상배율',
-#  '매출채권회전율',
-#  '재고자산회전율',
-#  '매출액',
-#  '세전계속사업이익',
-#  '당기순이익(지배)',
-#  '자본총계(지배)',
-#  'EBITDA2',
-#  '순부채',
-#  'IPO_PER',
-#  'IPO_PBR',
-#  'IPO_EV/EBIDTA',
-#  'IPO_PSR',
-#  '1개월 시가총액회전율',
-#  '3개월 시가총액회전율',
-#  '1개월 평균 거래량회전율',
-#  '3개월 평균 거래량회전율',
-#  '1개월 평균 일중변동률',
-#  '3개월 평균 일중변동률',
-#  '1개월 평균 개인 매도수량 비중(일간)',
-#  '3개월 평균 개인 매도수량 비중(일간)',
-#  '1개월 평균 개인 매수수량 비중(일간)',
-#  '3개월 평균 개인 매수수량 비중(일간)',
-#  '1개월 평균 기관 매수수량 비중(일간)',
-#  '3개월 평균 기관 매수수량 비중(일간)',
-#  '1개월 평균 기관 매도수량 비중(일간)',
-#  '3개월 평균 기관 매도수량 비중(일간)',
-#  '시장수익률',
-# '1개월 시장 회전율',
-#  '3개월 시장 회전율',
-#  'M2 증감률 ',
-#  'MMF 증감률 ',
-#  '고객예탁금 증감률 ',
-#  '국고1년시장금리%p',
-#  '국고3년시장금리%p',
-#  '국고5년시장금리%p']]
-
-# ## 멀티인덱스 설정
-# test.columns = [['IPO']*5 + ['Finance']*23 + ['Trading']*14 + ['Market']*9 ,\
-# ['IPO지표']*5 + ['수익성']*3 + ['성장성']*4 + ['유동성']*2 + ['안정성']*2 + \
-# ['활동성']*2 +['규모']*2 + ['삭제할듯']*4 + ['가격결정자 정보']*4 + ['유동지표'] \
-# *6 +['매매비중정보']*8 + ['코스닥정보']*3 + ['유동성']*3 +['금리']*3 ,\
-# ['상장유형',
-#  '공모가(원)',
-#  '상장일',
-#  '상장주식수',
-#  'IPO시가총액',
-#  '매출총이익률',
-#  '영업이익률',
-#  'ROE(지배)',
-#  '매출액증가율(YoY)',
-#  '영업이익증가율(YoY)',
-#  '매출액증가율(YoY)-before',
-#  '영업이익증가율(YoY)-before',
-#  '유동비율',
-#  '당좌비율',
-#  '부채비율',
-#  '이자보상배율',
-#  '매출채권회전율',
-#  '재고자산회전율',
-#  '매출액',
-#  '세전계속사업이익',
-#  '당기순이익(지배)',
-#  '자본총계(지배)',
-#  'EBITDA2',
-#  '순부채',
-#  'IPO_PER',
-#  'IPO_PBR',
-#  'IPO_EV/EBIDTA',
-#  'IPO_PSR',
-#  '1개월 시가총액회전율',
-#  '3개월 시가총액회전율',
-#  '1개월 평균 거래량회전율',
-#  '3개월 평균 거래량회전율',
-#  '1개월 평균 일중변동률',
-#  '3개월 평균 일중변동률',
-#  '1개월 평균 개인 매도수량 비중(일간)',
-#  '3개월 평균 개인 매도수량 비중(일간)',
-#  '1개월 평균 개인 매수수량 비중(일간)',
-#  '3개월 평균 개인 매수수량 비중(일간)',
-#  '1개월 평균 기관 매수수량 비중(일간)',
-#  '3개월 평균 기관 매수수량 비중(일간)',
-#  '1개월 평균 기관 매도수량 비중(일간)',
-#  '3개월 평균 기관 매도수량 비중(일간)',
-#  '시장수익률',
-# '1개월 시장 회전율',
-#  '3개월 시장 회전율',
-#  'M2 증감률 ',
-#  'MMF 증감률 ',
-#  '고객예탁금 증감률 ',
-#  '국고1년시장금리%p',
-#  '국고3년시장금리%p',
-#  '국고5년시장금리%p']]
-
-# # > 엑셀 불러오면 멀티인덱스 풀리기에 불러온 뒤 멀티인덱스 편하게 설정하는 방법 찾기
-# """

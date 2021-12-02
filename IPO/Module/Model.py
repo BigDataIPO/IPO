@@ -158,6 +158,13 @@ def frame(y_data):
 
 # %% [markdown]
 # # 랜덤포레스트
+# ## 공통 전처리
+# 1. 종목명과 공모 시가총액 변수 Drop
+# 2. 상장일을 인덱스로 설정 후 종속변수 별로 카테고리 분류
+# 3. train 4년 test1년으로 총 기간을 3개월 이동하며 32개 모델 분할
+# 4. 데이터 분포가 매우 불균형하고 적기에 오버샘플링(SMOTE) 진행
+# 5. 랜덤포레스트,XGB,LGBM의 하이퍼파라미터들을 수정하며 최적 파라미터에 대해 모델 분석
+# 6. 32개 모델에 대해 평가성과 , 변수중요도 , 예측결과 및 실제Y분포 출력
 
 # %%
 def process_final(df,y_name):
@@ -452,6 +459,7 @@ def process_lgbm(df,y_name):
 
 # %% [markdown]
 # ## ROS
+# > 오버샘플링 기법중 SMOTE와 ROS 비교를 위한 ROS 코드
 
 # %%
 def process_final_ros(df,y_name):
@@ -546,5 +554,3 @@ def process_final_ros(df,y_name):
 
         
     return df_score 
-
-# %%

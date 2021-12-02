@@ -157,7 +157,7 @@ def MatchItem_per(FeatureDf, finding ,num,trading,stock,finance):
     return FeatureDf
 
 
-def MatchItem_per_new(FeatureDf,finding,trading,stock,finance):
+def MatchItem_endper(FeatureDf,finding,trading,stock,finance):
     """
     종가 대비 per 구하기
     """
@@ -208,7 +208,7 @@ def MatchItem_pbr(FeatureDf, finding ,num,trading,stock,finance):
     return FeatureDf
 
 
-def MatchItem_pbr_new( FeatureDf, finding,trading,stock,finance):
+def MatchItem_endpbr( FeatureDf, finding,trading,stock,finance):
     """
     종가 대비 pbr 구하기
     """
@@ -262,7 +262,7 @@ def MatchItem_ev(FeatureDf, finding ,num,trading,stock,finance):
     return FeatureDf
 
 
-def MatchItem_ev_new(FeatureDf, finding,trading,stock,finance):
+def MatchItem_endev(FeatureDf, finding,trading,stock,finance):
     """
     종가 대비 ev/ebitda 구하기
     """
@@ -524,88 +524,11 @@ def Cut(Series , cuts):
     return pd.cut(Series, Cuts, labels = label)
 # ## 변수 위치 재설정
 
-# ## 종가 변수 추가
-
-def MatchItem_per_new(IPOcoms, FeatureDf, finding):
-    """
-    per/pbr/ev 등등 구하기
-    """
-    IPOcoms = FeatureDf.index
-    FeatureDf[finding] = np.nan
-    for i in IPOcoms:
-        IPOday = FeatureDf.loc[i,'상장일']
-        
-        if parse(IPOday).date().month < 4:
-            day= datetime(parse(IPOday).year,12,31).date() - \
-            relativedelta(years = 2)
-        else :
-            day = datetime(parse(IPOday).year,12,31).date() - \
-            relativedelta(years = 1)
-            
-        num_1 = trading.loc[(i,'종가'),IPOday]
-        num_2 = stock.loc[i,IPOday][0]
-        num_3 = finance.loc[(i,'당기순이익'),str(day)]
-        
-        per = (num_1*num_2)/(num_3*1000)
-        FeatureDf.loc[i,finding] = per
-    return FeatureDf
-
-
-def MatchItem_pbr_new(IPOcoms, FeatureDf, finding):
-    """
-    
-    per/pbr/ev 등등 구하기
-    """
-    IPOcoms = FeatureDf.index
-    FeatureDf[finding] = np.nan
-    for i in IPOcoms:
-        IPOday = FeatureDf.loc[i,'상장일']
-        
-        
-        if parse(IPOday).date().month < 4:
-            day= datetime(parse(IPOday).year,12,31).date() - \
-            relativedelta(years = 2)
-        else :
-            day = datetime(parse(IPOday).year,12,31).date() - \
-            relativedelta(years = 1)
-            
-        num_1 = trading.loc[(i,'종가'),IPOday]
-        num_2 = stock.loc[i,IPOday][0]
-        num_3 = finance.loc[(i,'자본총계'),str(day)]
-        
-        pbr = (num_1*num_2)/(num_3*1000)
-        FeatureDf.loc[i,finding] = pbr
-    return FeatureDf
-
-
-def MatchItem_ev_new(IPOcoms, FeatureDf, finding):
-    """
-    per/pbr/ev 등등 구하기
-    """
-    IPOcoms = FeatureDf.index
-    FeatureDf[finding] = np.nan
-    for i in IPOcoms:
-        IPOday = FeatureDf.loc[i,'상장일']
-
-        
-        if parse(IPOday).date().month < 4:
-            day= datetime(parse(IPOday).year,12,31).date() - \
-            relativedelta(years = 2)
-        else :
-            day = datetime(parse(IPOday).year,12,31).date() - \
-            relativedelta(years = 1)
-            
-        num_1 = trading.loc[(i,'종가'),IPOday]
-        num_2 = stock.loc[i,IPOday][0]
-        num_3 = finance.loc[(i,'순부채'),str(day)]
-        num_4 = finance.loc[(i,'EBITDA2'),str(day)]
-        
-        ebitda = (num_1*num_2 + num_3*1000)/(num_4*1000)
-        FeatureDf.loc[i,finding] = ebitda
-    return FeatureDf
-
-
 # ## 모델별 y_data 분포
+# 1. 종목명과 공모 시가총액 변수 Drop
+# 2. 상장일을 인덱스로 설정 후 종속변수 별로 카테고리 분류
+# 3. train 4년 test1년으로 총 기간을 3개월 이동하며 32개 모델 분할
+# 4. 32개 모델 별로 종속변수 분포 출력
 
 def process(df,y_name):
     
@@ -614,18 +537,18 @@ def process(df,y_name):
     df = df.set_index(['상장일'])
     df = df.drop(['종목명','공모 시가총액'],axis = 1) ## 나중에 카테고리 진행할려면 남겨줄 것
     if y_name == '공모가 대비 6개월 수익률':
-        df['Cat'] = Cut(df[y_name],[-0.4, -0.2, 0.2, 0.4])
+        df['Cat'] = Cut(df[y_name],[ -0.2, 0.2, 0.4])
         df = df.drop(y_name,axis = 1)
         
     else :
-        df['Cat'] = Cut(df[y_name],[-0.2, -0.1, 0.1, 0.2])
+        df['Cat'] = Cut(df[y_name],[-0.1, 0.1, 0.2])
         df = df.drop(y_name,axis = 1)
     
-    ## train 3년 test 1년으로 총 기간을 3개월 이동으로 36개 구간분할
+    ## train 4년 test 1년으로 총 기간을 3개월 이동으로 32개 구간분할
     train_list = []
     test_list = []
-    train_start_date = '2009-04-01' ## 기한은 나중에 변경할수도
-    test_start_date = parse(str(train_start_date)).date() + relativedelta(years =3)
+    train_start_date = '2009-04-01' 
+    test_start_date = parse(str(train_start_date)).date() + relativedelta(years =4)
     train_end_date = parse(str(test_start_date)).date() - relativedelta(days =1)
     test_end_date = parse(str(train_end_date)).date() + relativedelta(years =1)
 
@@ -639,25 +562,25 @@ def process(df,y_name):
         train_end_date = parse(str(train_end_date)).date() + relativedelta(months=3)
         test_end_date = parse(str(test_end_date)).date() + relativedelta(months=3)
 
-        if str(train_start_date) == '2018-04-01':
+        if str(train_start_date) == '2017-04-01':
             break
     
     ## y_data 분포 확인 및 데이터프레임 생성
-    df_1 = train_list[0]['Cat'].value_counts().reindex([1,2,3,4,5])
-    df_2 = test_list[0]['Cat'].value_counts().reindex([1,2,3,4,5])
+    df_1 = train_list[0]['Cat'].value_counts().reindex([1,2,3,4])
+    df_2 = test_list[0]['Cat'].value_counts().reindex([1,2,3,4])
     df_y = pd.concat([df_1,df_2])
     
     
     for i in range(1,len(train_list)):
-        a = train_list[i]['Cat'].value_counts().reindex([1,2,3,4,5])
-        b = test_list[i]['Cat'].value_counts().reindex([1,2,3,4,5])
+        a = train_list[i]['Cat'].value_counts().reindex([1,2,3,4])
+        b = test_list[i]['Cat'].value_counts().reindex([1,2,3,4])
     
         new_data = pd.concat([a,b] ,axis =0)
         df_y = pd.concat([df_y,new_data],axis =1)
         
-    df_y.columns = list(range(0,36))
-    df_y.index = ['Train_1','Train_2','Train_3','Train_4','Train_5',\
-              'Test_1','Test_2','Test_3','Test_4','Test_5']
+    df_y.columns = list(range(len(train_list)))
+    df_y.index = ['Train_1','Train_2','Train_3','Train_4',\
+              'Test_1','Test_2','Test_3','Test_4']
     df_y.rename(columns = lambda x : "model_set_"+ str(x),inplace = True)
     
     return df_y

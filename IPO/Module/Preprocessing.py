@@ -524,88 +524,11 @@ def Cut(Series , cuts):
     return pd.cut(Series, Cuts, labels = label)
 # ## 변수 위치 재설정
 
-# ## 종가 변수 추가
-
-def MatchItem_per_new(IPOcoms, FeatureDf, finding):
-    """
-    per/pbr/ev 등등 구하기
-    """
-    IPOcoms = FeatureDf.index
-    FeatureDf[finding] = np.nan
-    for i in IPOcoms:
-        IPOday = FeatureDf.loc[i,'상장일']
-        
-        if parse(IPOday).date().month < 4:
-            day= datetime(parse(IPOday).year,12,31).date() - \
-            relativedelta(years = 2)
-        else :
-            day = datetime(parse(IPOday).year,12,31).date() - \
-            relativedelta(years = 1)
-            
-        num_1 = trading.loc[(i,'종가'),IPOday]
-        num_2 = stock.loc[i,IPOday][0]
-        num_3 = finance.loc[(i,'당기순이익'),str(day)]
-        
-        per = (num_1*num_2)/(num_3*1000)
-        FeatureDf.loc[i,finding] = per
-    return FeatureDf
-
-
-def MatchItem_pbr_new(IPOcoms, FeatureDf, finding):
-    """
-    
-    per/pbr/ev 등등 구하기
-    """
-    IPOcoms = FeatureDf.index
-    FeatureDf[finding] = np.nan
-    for i in IPOcoms:
-        IPOday = FeatureDf.loc[i,'상장일']
-        
-        
-        if parse(IPOday).date().month < 4:
-            day= datetime(parse(IPOday).year,12,31).date() - \
-            relativedelta(years = 2)
-        else :
-            day = datetime(parse(IPOday).year,12,31).date() - \
-            relativedelta(years = 1)
-            
-        num_1 = trading.loc[(i,'종가'),IPOday]
-        num_2 = stock.loc[i,IPOday][0]
-        num_3 = finance.loc[(i,'자본총계'),str(day)]
-        
-        pbr = (num_1*num_2)/(num_3*1000)
-        FeatureDf.loc[i,finding] = pbr
-    return FeatureDf
-
-
-def MatchItem_ev_new(IPOcoms, FeatureDf, finding):
-    """
-    per/pbr/ev 등등 구하기
-    """
-    IPOcoms = FeatureDf.index
-    FeatureDf[finding] = np.nan
-    for i in IPOcoms:
-        IPOday = FeatureDf.loc[i,'상장일']
-
-        
-        if parse(IPOday).date().month < 4:
-            day= datetime(parse(IPOday).year,12,31).date() - \
-            relativedelta(years = 2)
-        else :
-            day = datetime(parse(IPOday).year,12,31).date() - \
-            relativedelta(years = 1)
-            
-        num_1 = trading.loc[(i,'종가'),IPOday]
-        num_2 = stock.loc[i,IPOday][0]
-        num_3 = finance.loc[(i,'순부채'),str(day)]
-        num_4 = finance.loc[(i,'EBITDA2'),str(day)]
-        
-        ebitda = (num_1*num_2 + num_3*1000)/(num_4*1000)
-        FeatureDf.loc[i,finding] = ebitda
-    return FeatureDf
-
-
 # ## 모델별 y_data 분포
+# 1. 종목명과 공모 시가총액 변수 Drop
+# 2. 상장일을 인덱스로 설정 후 종속변수 별로 카테고리 분류
+# 3. train 4년 test1년으로 총 기간을 3개월 이동하며 32개 모델 분할
+# 4. 32개 모델 별로 종속변수 분포 출력
 
 def process(df,y_name):
     
